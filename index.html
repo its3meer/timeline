@@ -1,0 +1,1630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timeline</title>
+    <style>
+        @font-face {
+            font-family: stc;
+            src: url('STCForward-Regular.ttf');
+        }
+
+        body {
+            font-family: stc, 'Montserrat', sans-serif;
+            position: relative;
+            margin: 20px;
+            padding: 0 40px;
+            overflow-x: auto; /* Allow horizontal scrolling on the body if needed */
+        }
+        .logo-container {
+            position: absolute;
+            top: 20px;
+            right: 40px;
+            z-index: 10;
+        }
+
+        .logo {
+            height: 30px;
+            width: auto;
+        }
+        .gantt-table {
+            width: auto; /* Changed from 100% to auto */
+            min-width: 100%; /* Ensure it takes at least full width */
+            border-collapse: collapse;
+            table-layout: fixed;
+            border: none;
+        }
+        .gantt-table td, .gantt-table th {
+            border: 1px solid #8E9AA0;
+            padding: 0;
+            height: 60px;
+            position: relative;
+        }
+        /* Sticky header styles */
+        .gantt-container {
+            width: auto; /* Changed from 100% to auto to allow growth */
+            min-width: 100%; /* Ensure it's at least full width */
+            overflow-x: auto; /* Allow horizontal scrolling if needed */
+            overflow-y: visible; /* Remove vertical scrolling */
+            max-height: none; /* Remove the max-height limitation */
+        }
+
+        .gantt-table thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .gantt-table thead tr:first-child {
+            position: sticky;
+            top: 0;
+            z-index: 11;
+        }
+
+        .gantt-table thead tr:nth-child(2) {
+            position: sticky;
+            top: 38px;
+            z-index: 11;
+        }
+
+        /* Remove border from the top-left corner cell */
+        .gantt-table th:first-child,
+        .gantt-table td:first-child {
+            border-left: none !important;
+        }
+        .gantt-table thead tr:first-child th {
+            border-top: none;
+        }
+        /* Ensure header cells have solid background to hide content underneath */
+        .gantt-table .year-header {
+            background-color: #4F008C; /* Use your STC purple color */
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1); /* Optional shadow for visual separation */
+        }
+
+        .gantt-table .month-header {
+            background-color: #4F008C; /* Use your STC purple color */
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1); /* Optional shadow for visual separation */
+        }
+
+        /* Make sure the first cell in each header row also has a solid background */
+        .gantt-table thead tr:first-child th:first-child,
+        .gantt-table thead tr:nth-child(2) th:first-child {
+            background-color: white;
+            z-index: 12; /* Higher z-index to appear above other header cells */
+            border-bottom: none;
+        }
+
+        /* Enhanced scrollbar styling for better usability */
+        .gantt-container::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        .gantt-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .gantt-container::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 5px;
+        }
+
+        .gantt-container::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        .year-header {
+            background-color: #4F008C;
+            color: white;
+            text-align: center;
+            padding: 10px 0;
+            font-weight: bold;
+        }
+        .month-header {
+            background-color: #4F008C;
+            color: white;
+            text-align: center;
+            padding: 8px 0;
+            font-weight: normal;
+            border-top: none !important;
+            border-bottom: none !important;
+            width: 100px; /* Increased from 80px for more space */
+            min-width: 100px; /* Added to ensure minimum width */
+        }
+        .task-label {
+            width: 300px;
+            min-width: 300px;
+            padding: 20px 10px 5px 20px !important; /* Enforce padding with !important */
+            background-color: #f5f5f5;
+            font-weight: bold;
+            vertical-align: top;
+            border-right: 1px solid #ccc;
+            border-left: 5px solid #3F51B5;
+            position: relative;
+            box-sizing: border-box; /* Ensure padding is included in width calculation */
+        }
+        .task-label.expanded {
+            background-color: #F2F2F2;
+            padding: 20px 10px 5px 20px !important; /* Maintain padding when expanded */
+        }
+        .task-label > div.task-description {
+            margin-top: 10px;
+            font-size: 12px;
+            font-weight: normal;
+            color: #444;
+            padding-right: 25px;
+            padding-bottom: 25px;
+            word-wrap: break-word;
+        }
+
+        .subtask-label {
+            font-size: 14px;
+            font-weight: bold;
+            width: 300px;
+            min-width: 300px;
+            padding: 20px 10px 5px 40px !important; /* Increased top padding (20px) and adjusted left padding (40px) */
+            background-color: #f9f9f9;
+            vertical-align: top;
+            border-right: 1px solid #ccc;
+            border-left: none; /* Remove left border */
+            position: relative;
+            box-sizing: border-box; /* Ensure padding is included in width calculation */
+        }
+
+        .subtask-label > div.task-description {
+            margin-top: 10px;
+            font-size: 12px;
+            font-weight: normal;
+            color: #444;
+            padding-right: 25px;
+            padding-bottom: 25px;
+            word-wrap: break-word;
+        }
+        .subtask-label::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 5px;
+            background-color: #9575CD; /* Lighter purple for subtasks */
+            z-index: 1;
+        }
+
+        .subtask-row.expanded-child .subtask-label {
+            background-color: #D9D9D9; /* Same background color for expanded subtasks */
+            padding: 20px 10px 5px 40px !important; /* Maintain padding when expanded */
+        }
+        .task-description {
+            margin-top: 10px; /* Adjusted margin to work with the new top padding */
+            font-size: 12px;
+            font-weight: normal;
+            color: #444;
+            padding-left: 0px;
+            padding-bottom: 25px;
+            word-wrap: break-word;
+        }
+        .task-bar {
+            position: absolute;
+            height: 25px;
+            top: 50%; /* Change from fixed top to 50% */
+            transform: translateY(-50%); /* Add this to center vertically */
+            z-index: 1;
+        }
+        .task-progress {
+            position: absolute;
+            height: 10px;
+            top: 50%; /* Change from fixed top to 50% */
+            transform: translateY(-50%); /* Add this to center vertically */
+            z-index: 2;
+        }
+
+        /* Center milestone diamonds vertically */
+        .milestone {
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            transform: translateY(-50%) rotate(45deg); /* Combined transformations */
+            top: 50%; /* Change from fixed top to 50% */
+            z-index: 3;
+            margin-left: -10px;
+        }
+
+        /* Adjust milestone labels to appear below the centered diamonds */
+        .milestone-label {
+            position: absolute;
+            top: calc(50% + 15px); /* Position below the centered diamond */
+            transform: translateX(-50%);
+            font-size: 11px;
+            color: #444;
+            text-align: center;
+            max-width: 120px;
+            white-space: normal;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        /* tooltip for labels */
+        .milestone-tooltip {
+            position: absolute;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 12px;
+            font-size: 12px;
+            max-width: 250px;
+            z-index: 10;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            white-space: normal;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+        }
+        .current-date-line {
+            position: absolute;
+            height: 100%; /* Keep full height */
+            width: 2px;
+            border-left: 2px dashed #FF5722;
+            z-index: 4;
+            top: 0; /* Keep at top */
+        }
+
+        /* Adjust the current date indicator to appear at the top */
+        .current-date-indicator {
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-bottom: 20px solid #FF5722;
+            transform: translateX(-10px);
+            z-index: 5;
+            top: 0; /* Keep at top */
+        }
+        .expand-icon {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            width: 20px;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 5;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease;
+        }
+        .expand-icon:hover {
+            background-color: #e0e0e0;
+        }
+        .expand-icon::after {
+            content: "";
+            display: block;
+            width: 0;
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 5px solid #555;
+        }
+        .expanded .expand-icon::after {
+            border-top: 0;
+            border-bottom: 5px solid #555;
+        }
+        .subtask-row {
+            display: none;
+        }
+        .expanded + .subtask-row {
+            display: table-row;
+        }
+        .timeline-container {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+        }
+        .timeline-cell-highlighted {
+            background-color: #F2F2F2 !important;
+        }
+        .subtask-separator {
+            height: 1px;
+            background-color: #ddd;
+        }
+
+        .weekly-update-btn {
+            background-color: #ff4081;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+            display: inline-block;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+
+        .weekly-update-btn:hover {
+            background-color: #e91e63;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            width: 50%;
+            max-width: 500px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            position: relative;
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #aaa;
+            cursor: pointer;
+        }
+
+        .close-modal:hover {
+            color: #555;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .modal-message {
+            font-size: 14px;
+            line-height: 1.5;
+            color: #444;
+        }
+        .modal-message ul {
+            margin-top: 10px;
+            padding-left: 20px;
+        }
+
+        .modal-message li {
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+
+        .modal-message strong {
+            color: #3F51B5;
+        }
+    </style>
+</head>
+<body>
+    <h1>Timeline</h1>
+
+    <div class="logo-container">
+        <img src="Stc-logo.png" alt="STC Logo" class="logo">
+    </div>
+    
+    <div class="gantt-container" id="gantt-container"></div>
+
+    <div id="update-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <div class="modal-title">Weekly Updates</div>
+            <div class="modal-message" id="modal-message-content">
+                Loading update information...
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Color configuration
+        const chartColors = {
+            taskBar: "#4F008C",      // Deep purple for main task bars
+            progress: "#00BFA5",     // Teal for progress indicators
+            milestone: "#B39DDB",    // Light purple for milestone diamonds
+            currentDate: "#FF5722",  // Orange for current date indicator
+            headerBg: "#607D8B",     // Blue-gray for headers
+            taskLabel: "#1D252D",    // Indigo for task labels
+            
+            // Colors for subtasks
+            subtaskBar: "#1BCED8",   // Lighter purple for subtask bars
+            subtaskProgress: "#FFFFFF", // Lighter teal for subtask progress
+            subtaskMilestone: "#4F008C", // Light purple for subtask milestones
+            subtaskLabel: "#1D252D"  // Medium purple for subtask labels
+        };
+    
+        // JSON data for the Gantt chart
+        const ganttData = {
+            // Chart timeframe - manually specified
+            timeframe: {
+                startDate: "01-01-2025",
+                endDate: "31-12-2025"
+            },
+            
+            // Tasks with their phases and milestones
+            tasks: [
+                {
+                    id: 1,
+                    title: "Powerhouse:",
+                    description: "scale up Gen AI infrastructure",
+                    startDate: "01-01-2025",
+                    endDate: "31-12-2025",
+                    progress: {
+                        startDate: "01-01-2025",
+                        endDate: "01-05-2025"
+                    },
+                    weeklyMessage: `<strong>Weekly Updates:</strong>
+                    <ul>
+                        <li>stc brain cloud awarded</li>
+                        <li>stc brain on-prem (infra and cloud team did the alignment)</li>
+                    </ul>`,
+                    milestones: [
+                        {
+                            date: "01-05-2025",
+                            label: "stc brain on Cloud"
+                        },
+                        {
+                            date: "15-07-2025",
+                            label: "stc brain On prem"
+                        }
+                    ],
+                    expandable: true,
+                    subtasks: [
+                        {
+                            id: "1.1",
+                            title: "1. stc brain cloud",
+                            description: "",
+                            startDate: "01-01-2025",
+                            endDate: "31-12-2025",
+                            progress: {
+                                startDate: "01-01-2025",
+                                endDate: "01-05-2025"
+                            },
+                            milestones: [
+                                {
+                                    date: "01-05-2025",
+                                    label: "Project awarded"
+                                }
+                            ]
+                        },
+                        {
+                            id: "1.2",
+                            title: "2. stc brain on Prem",
+                            description: "",
+                            startDate: "01-01-2025",
+                            endDate: "31-12-2025",
+                            progress: {
+                                startDate: "01-01-2025",
+                                endDate: "01-05-2025"
+                            },
+                            milestones: [
+                                {
+                                    date: "01-06-2025",
+                                    label: "GPU cluster"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    id: 2,
+                    title: "Stc GPT:",
+                    description: "Avail an enterprise Gen AI platform for stc employees",
+                    startDate: "15-04-2025",
+                    endDate: "31-12-2025",
+                    progress: {
+                        startDate: "15-04-2025",
+                        endDate: "01-05-2025"
+                    },
+                    weeklyMessage: `<strong>Weekly Updates:</strong>
+                    <ul>
+                        <li>Cohere kickoff workshop.</li>
+                        <li>stc GPT in the testing phase, deployed in google.</li>
+                    </ul>
+                    <strong>Risk</strong>
+                    <ul>
+                        <li>stc GPT: Infra readiness might take more time due political factors, so we may want to factor that into our planning</li>
+                        <li>stc GPT: Data Governance and cybersecurity approvals</li>
+                    </ul>`,
+                    milestones: [
+                        {
+                            date: "15-06-2025",
+                            label: "Beta release"
+                        },
+                        {
+                            date: "30-07-2025",
+                            label: "Production Release"
+                        },
+                        {
+                            date: "15-12-2025",
+                            label: "Full Platform Rollout"
+                        }
+                    ],
+                    expandable: true,
+                    subtasks: [
+                        {
+                            id: "1.1",
+                            title: "1. Sandbox",
+                            description: "",
+                            startDate: "01-01-2025",
+                            endDate: "31-12-2025",
+                            progress: {
+                                startDate: "01-01-2025",
+                                endDate: "01-05-2025"
+                            },
+                            milestones: [
+                                {
+                                    date: "01-03-2025",
+                                    label: "Beta Version 1"
+                                },
+                                {
+                                    date: "01-04-2025",
+                                    label: "Beta Version 2"
+                                },
+                                {
+                                    date: "01-06-2025",
+                                    label: "Beta Version 3"
+                                }
+                            ]
+                        },
+                        {
+                            id: "1.2",
+                            title: "2. Cohere 'installation' & 'adoption'",
+                            description: "",
+                            startDate: "15-03-2025",
+                            endDate: "31-12-2025",
+                            progress: {
+                                startDate: "15-03-2025",
+                                endDate: "01-05-2025"
+                            },
+                            milestones: [
+                                {
+                                    date: "01-05-2025",
+                                    label: "1. CBU cluster handed over 2. Cybersecurity approvals & implementation"
+                                },
+                                {
+                                    date: "01-08-2025",
+                                    label: "Cohere installation & connecter integration "
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    id: 3,
+                    title: "RAI:",
+                    description: "ensure the adoption of RAI through guideline, change management and assets registration",
+                    startDate: "01-01-2025",
+                    endDate: "31-12-2025",
+                    progress: {
+                        startDate: "01-01-2025",
+                        endDate: "01-05-2025"
+                    },
+                    weeklyMessage: `<strong>Weekly Updates:</strong>
+                    <ul>
+                        <li>stcGPT internal usage guidelines</li>
+                        <li>stcGPT users consent and acknowledgment</li>
+                        <li>RAI guidelines v3 draft</li>
+                        <li>Registered 4 external assets - Audit models in the registry hub (eforms)</li>
+                        <li>Conducted 2 RAI leaders workshop across stc and the subsidiaries (Aqalat, stc Bank)</li>
+                    </ul>
+                    <strong>Weekly Updates:</strong>
+                    <ul>
+                        <li>Delay of R&C activation.</li>
+                    </ul>`,
+                    milestones: [
+                        {
+                            date: "05-01-2025",
+                            label: "RAI Guidelines V2"
+                        },
+                        {
+                            date: "01-05-2025",
+                            label: "RAI Awareness campaign"
+                        },
+                        {
+                            date: "01-07-2025",
+                            label: "RAI Guidelines V3"
+                        },
+                        {
+                            date: "31-12-2025",
+                            label: "RAI R&C activations"
+                        }
+                    ],
+                    expandable: true,
+                    subtasks: [
+                        {
+                            id: "3.1",
+                            title: "1. Asset registered",
+                            description: "",
+                            startDate: "01-01-2025",
+                            endDate: "31-12-2025",
+                            progress: {
+                                startDate: "01-01-2025",
+                                endDate: "01-05-2025"
+                            },
+                            milestones: [
+                                {
+                                    date: "15-02-2025",
+                                    label: "internal 15"
+                                },
+                                {
+                                    date: "01-04-2025",
+                                    label: "external 4 (done by audit)"
+                                },
+                                {
+                                    date: "15-12-2025",
+                                    label: "register 50 assets"
+                                }
+                            ]
+                        },
+                        {
+                            id: "3.2",
+                            title: "2. RAI Campaign",
+                            description: "",
+                            startDate: "01-01-2025",
+                            endDate: "31-12-2025",
+                            progress: {
+                                startDate: "01-01-2025",
+                                endDate: "01-05-2025"
+                            },
+                            milestones: [
+                                {
+                                    date: "01-02-2025",
+                                    label: "stc magazine, screens, emails"
+                                },
+                                {
+                                    date: "01-04-2025",
+                                    label: "Workshops"
+                                },
+                                {
+                                    date: "01-05-2025",
+                                    label: "Leadership Email"
+                                },
+                                {
+                                    date: "01-08-2025",
+                                    label: "Training course"
+                                }
+                            ]
+                        },
+                        {
+                            id: "3.3",
+                            title: "3. Guidelines",
+                            description: "",
+                            startDate: "01-01-2025",
+                            endDate: "31-12-2025",
+                            progress: {
+                                startDate: "01-01-2025",
+                                endDate: "01-05-2025"
+                            },
+                            milestones: [
+                                {
+                                    date: "10-01-2025",
+                                    label: "RAI Guidelines V2"
+                                },
+                                {
+                                    date: "01-05-2025",
+                                    label: "Stcgpt internal usage guidelines"
+                                },
+                                {
+                                    date: "01-07-2025",
+                                    label: "RAI Guidelines V3"
+                                }
+                            ]
+                        },
+                        {
+                            id: "3.4",
+                            title: "4. 3rd Party Management",
+                            description: "",
+                            startDate: "01-01-2025",
+                            endDate: "31-12-2025",
+                            progress: {
+                                startDate: "01-01-2025",
+                                endDate: "01-05-2025"
+                            },
+                            milestones: [
+                                {
+                                    date: "01-02-2025",
+                                    label: "3rd party selection criteria"
+                                },
+                                {
+                                    date: "01-06-2025",
+                                    label: "Current state assessment(TSK,DG,CS)"
+                                },
+                                {
+                                    date: "01-09-2025",
+                                    label: "AI 3rd party/Vendor assessment and evaluation"
+                                },
+                                {
+                                    date: "01-11-2025",
+                                    label: "AI 3rd party/Vendor management"
+                                }
+                            ]
+                        },
+                        {
+                            id: "3.5",
+                            title: "5. Certifications",
+                            description: "",
+                            startDate: "01-01-2025",
+                            endDate: "31-12-2025",
+                            progress: {
+                                startDate: "01-01-2025",
+                                endDate: "01-05-2025"
+                            },
+                            milestones: [
+                                {
+                                    date: "01-03-2025",
+                                    label: "RAC process design"
+                                },
+                                {
+                                    date: "01-07-2025",
+                                    label: "Jira process activation"
+                                },
+                                {
+                                    date: "31-12-2025",
+                                    label: "Certify assets"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    id: 4,
+                    title: "AI Value:",
+                    description: "Develop value realization framework",
+                    startDate: "01-04-2025",
+                    endDate: "31-12-2025",
+                    progress: {
+                        startDate: "01-04-2025",
+                        endDate: "01-05-2025"
+                    },
+                    weeklyMessage: `<strong>Weekly Updates:</strong>
+                    <ul>
+                        <li>Consulting the profitability team about the proposed framework (high level)</li>
+                    </ul>
+                    <strong>Risk</strong>
+                    <ul>
+                        <li>Adoption to realize the value & align with finance to realize the value as per their mandate.</li>
+                    </ul>`,
+                    milestones: [
+                        {
+                            date: "01-06-2025",
+                            label: "Define Framework & Methodology"
+                        },
+                        {
+                            date: "01-11-2025",
+                            label: "Align with Business Finance to establish engagement process"
+                        },
+                        {
+                            date: "31-12-2025",
+                            label: "Value Framework v2"
+                        }
+                    ],
+                    expandable: true,
+                    subtasks: [
+                        {
+                            id: "3.1",
+                            title: "1.1 Defined & propose the calculation methodology",
+                            description: "",
+                            startDate: "01-04-2025",
+                            endDate: "31-05-2025",
+                            progress: {
+                                startDate: "01-04-2025",
+                                endDate: "01-05-2025"
+                            },
+                            milestones: [
+                                
+                            ]
+                        },
+                        {
+                            id: "3.2",
+                            title: "1.2 Obtain the by end from management",
+                            description: "",
+                            startDate: "01-04-2025",
+                            endDate: "01-06-2025",
+                            progress: {
+                                startDate: "01-04-2025",
+                                endDate: "01-05-2025"
+                            },
+                            milestones: [
+                                
+                            ]
+                        },
+                        {
+                            id: "3.3",
+                            title: "2.1 Align with Business Finance/GEP to establish engagement process for recognizing monetary value and non value monetary.",
+                            description: "",
+                            startDate: "01-06-2025",
+                            endDate: "01-11-2025",
+                            progress: {
+                                startDate: "",
+                                endDate: ""
+                            },
+                            milestones: [
+                                
+                            ]
+                        },
+                        {
+                            id: "3.4",
+                            title: "2.2 Create process",
+                            description: "",
+                            startDate: "01-06-2025",
+                            endDate: "01-11-2025",
+                            progress: {
+                                startDate: "",
+                                endDate: ""
+                            },
+                            milestones: [
+                                
+                            ]
+                        },
+                        {
+                            id: "3.5",
+                            title: "2.3 Obtain management approval",
+                            description: "",
+                            startDate: "01-06-2025",
+                            endDate: "01-11-2025",
+                            progress: {
+                                startDate: "",
+                                endDate: ""
+                            },
+                            milestones: [
+                                
+                            ]
+                        },
+                        {
+                            id: "3.6",
+                            title: "3.1 Create show back model",
+                            description: "",
+                            startDate: "01-11-2025",
+                            endDate: "31-12-2025",
+                            progress: {
+                                startDate: "",
+                                endDate: ""
+                            },
+                            milestones: [
+                                
+                            ]
+                        },
+                        {
+                            id: "3.7",
+                            title: "3.2 Final signoff",
+                            description: "",
+                            startDate: "01-11-2025",
+                            endDate: "31-12-2025",
+                            progress: {
+                                startDate: "",
+                                endDate: ""
+                            },
+                            milestones: [
+                                
+                            ]
+                        }
+                    ]
+                },
+                {
+                    id: 5,
+                    title: "Adoption:",
+                    description: "targeted change management activities aimed at certain domains (3 target domains)",
+                    startDate: "01-04-2025",
+                    endDate: "31-12-2025",
+                    progress: {
+                        startDate: "01-04-2025",
+                        endDate: "01-05-2025"
+                    },
+                    weeklyMessage: `<strong>Weekly Updates:</strong>
+                    <ul>
+                        <li>Target adoption over 12 month is 50% for stc GPT</li>
+                    </ul>`,
+                    milestones: [
+                        {
+                            date: "01-05-2025",
+                            label: "Communication plan (Awareness)"
+                        },
+                        {
+                            date: "01-06-2025",
+                            label: "Communication plan (Activation)"
+                        },
+                        {
+                            date: "01-07-2025",
+                            label: "Upskilling Academy (Engagement)"
+                        },
+                        {
+                            date: "01-08-2025",
+                            label: "Lighthouse - 12-week Journey (Enablement)"
+                        },
+                        {
+                            date: "01-11-2025",
+                            label: "Scaled Adoption (Trust)"
+                        }
+                    ],
+                    expandable: true,
+                    subtasks: [
+                        {
+                            id: "4.1",
+                            title: "1.1 General use cases",
+                            description: "",
+                            startDate: "01-01-2025",
+                            endDate: "31-12-2025",
+                            progress: {
+                                startDate: "01-01-2025",
+                                endDate: "01-05-2025"
+                            },
+                            milestones: [
+                                
+                            ]
+                        },
+                        {
+                            id: "4.2",
+                            title: "1.2 Cohere use cases",
+                            description: "",
+                            startDate: "01-01-2025",
+                            endDate: "31-12-2025",
+                            progress: {
+                                startDate: "01-01-2025",
+                                endDate: "01-05-2025"
+                            },
+                            milestones: [
+                                
+                            ]
+                        },
+                        {
+                            id: "4.3",
+                            title: "1.3 GEP use cases",
+                            description: "",
+                            startDate: "01-01-2025",
+                            endDate: "31-12-2025",
+                            progress: {
+                                startDate: "01-01-2025",
+                                endDate: "01-05-2025"
+                            },
+                            milestones: [
+                                
+                            ]
+                        },
+                        {
+                            id: "4.4",
+                            title: "1.4 Sector on boarded on cohere",
+                            description: "",
+                            startDate: "01-01-2025",
+                            endDate: "31-12-2025",
+                            progress: {
+                                startDate: "01-01-2025",
+                                endDate: "01-05-2025"
+                            },
+                            milestones: [
+                                
+                            ]
+                        },
+                        {
+                            id: "4.5",
+                            title: "1.5 Cohere active users",
+                            description: "",
+                            startDate: "01-01-2025",
+                            endDate: "31-12-2025",
+                            progress: {
+                                startDate: "01-01-2025",
+                                endDate: "01-05-2025"
+                            },
+                            milestones: [
+                                
+                            ]
+                        },
+                    ]
+                }
+            ]
+        };
+
+        function getCurrentDate() {
+            const today = new Date();
+            const day = String(today.getDate()).padStart(2, '0');
+            const month = String(today.getMonth() + 1).padStart(2, '0'); // January is 0
+            const year = today.getFullYear();
+            
+            return `${day}-${month}-${year}`;
+        }
+
+        // Function to parse dates in dd-mm-yyyy format
+        function parseDate(dateString) {
+            const parts = dateString.split('-');
+            // Note: month is 0-indexed in JavaScript Date object (0 = January)
+            return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+        }
+
+        // Function to render the Gantt chart
+        function renderGanttChart() {
+            const container = document.getElementById('gantt-container');
+            container.innerHTML = '';
+
+            // Parse dates from the data
+            const timeframeStart = parseDate(ganttData.timeframe.startDate);
+            const timeframeEnd = parseDate(ganttData.timeframe.endDate);
+            const currentDate = new Date();
+
+            // Create months array based on timeframe
+            const months = [];
+            let currentMonth = new Date(timeframeStart.getFullYear(), timeframeStart.getMonth(), 1);
+            
+            while (currentMonth <= timeframeEnd) {
+                months.push({
+                    date: new Date(currentMonth),
+                    monthName: currentMonth.toLocaleString('default', { month: 'short' }),
+                    year: currentMonth.getFullYear()
+                });
+                currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
+            }
+
+            // Calculate days in the full timeframe for positioning
+            const totalDays = Math.ceil((timeframeEnd - timeframeStart) / (1000 * 60 * 60 * 24));
+
+            // Create table
+            const table = document.createElement('table');
+            table.className = 'gantt-table';
+            table.style.tableLayout = "fixed";
+            
+            // Create thead
+            const thead = document.createElement('thead');
+            
+            // Create year header row
+            const yearRow = document.createElement('tr');
+            
+            // Empty cell for task label
+            const emptyYearCell = document.createElement('th');
+            emptyYearCell.style.width = "300px";
+            emptyYearCell.style.minWidth = "300px";
+            emptyYearCell.style.borderTop = "none";
+            emptyYearCell.style.borderBottom = "none";
+            yearRow.appendChild(emptyYearCell);
+            
+            // Group months by year
+            const years = {};
+            months.forEach(month => {
+                if (!years[month.year]) {
+                    years[month.year] = 0;
+                }
+                years[month.year]++;
+            });
+            
+            // Add year headers
+            Object.keys(years).forEach(year => {
+                const yearHeader = document.createElement('th');
+                yearHeader.className = 'year-header';
+                yearHeader.colSpan = years[year];
+                yearHeader.textContent = year;
+                yearRow.appendChild(yearHeader);
+            });
+            
+            thead.appendChild(yearRow);
+            
+            // Create month header row
+            const monthRow = document.createElement('tr');
+            
+            // Empty cell for task label
+            const emptyMonthCell = document.createElement('th');
+            emptyMonthCell.style.width = "300px";
+            emptyMonthCell.style.minWidth = "300px";
+            emptyMonthCell.style.borderTop = "none";
+            emptyMonthCell.style.borderBottom = "none";
+            monthRow.appendChild(emptyMonthCell);
+            
+            // Add month headers
+            months.forEach(month => {
+                const monthHeader = document.createElement('th');
+                monthHeader.className = 'month-header';
+                monthHeader.textContent = month.monthName;
+                monthRow.appendChild(monthHeader);
+            });
+            
+            thead.appendChild(monthRow);
+            table.appendChild(thead);
+            
+            // Create tbody
+            const tbody = document.createElement('tbody');
+            
+            // Track the expanded state
+            let expandedTasks = {};
+            
+            // Create task rows
+            ganttData.tasks.forEach(task => {
+                // Create main task row
+                const taskRow = document.createElement('tr');
+                taskRow.id = `task-${task.id}`;
+                taskRow.dataset.taskId = task.id;
+                
+                // Task label cell
+                const labelCell = document.createElement('td');
+                labelCell.className = 'task-label';
+                labelCell.style.width = "300px";
+                labelCell.style.minWidth = "300px";
+                labelCell.innerHTML = `${task.title} <div class="task-description">${task.description}</div>`;
+
+                // Add the weekly update button
+                createWeeklyUpdateButton(task, labelCell);
+                
+                // Add expand icon if task is expandable
+                if (task.expandable) {
+                    const expandIcon = document.createElement('div');
+                    expandIcon.className = 'expand-icon';
+                    expandIcon.setAttribute('title', 'Expand for details');
+                    expandIcon.addEventListener('click', function() {
+                        const taskId = task.id;
+                        
+                        // This section is new - it closes other expanded tasks before opening this one
+                        // First check if this task is already expanded
+                        const isAlreadyExpanded = expandedTasks[taskId];
+                        
+                        // If not already expanded, close all other expanded tasks
+                        if (!isAlreadyExpanded) {
+                            // Find all expanded tasks
+                            Object.keys(expandedTasks).forEach(id => {
+                                if (expandedTasks[id] && id != taskId) {
+                                    // Get the row and label cell to remove expanded class
+                                    const otherTaskRow = document.getElementById(`task-${id}`);
+                                    const otherLabelCell = otherTaskRow.querySelector('.task-label');
+                                    const otherTimelineCell = otherTaskRow.querySelector('td:last-child');
+                                    
+                                    // Remove expanded classes
+                                    otherLabelCell.classList.remove('expanded');
+                                    otherTaskRow.classList.remove('expanded');
+                                    otherTimelineCell.classList.remove('timeline-cell-highlighted');
+                                    
+                                    // Hide subtask rows
+                                    const otherSubtaskRows = document.querySelectorAll(`.subtask-row[data-parent="${id}"]`);
+                                    otherSubtaskRows.forEach(row => {
+                                        row.style.display = 'none';
+                                        row.classList.remove('expanded-child');
+                                        
+                                        // Remove highlight from timeline cell
+                                        const subtaskTimelineCell = row.querySelector('td:last-child');
+                                        subtaskTimelineCell.classList.remove('timeline-cell-highlighted');
+                                    });
+                                    
+                                    // Update expanded state
+                                    expandedTasks[id] = false;
+                                }
+                            });
+                        }
+                        
+                        // Toggle the current task's expanded state
+                        expandedTasks[taskId] = !expandedTasks[taskId];
+                        
+                        // Toggle expanded class on the task label
+                        labelCell.classList.toggle('expanded');
+                        taskRow.classList.toggle('expanded');
+                        
+                        // Toggle background color on the timeline cell of the main task
+                        const taskTimelineCell = taskRow.querySelector('td:last-child');
+                        taskTimelineCell.classList.toggle('timeline-cell-highlighted');
+                        
+                        // Show/hide subtask rows and add/remove expanded-child class
+                        const subtaskRows = document.querySelectorAll(`.subtask-row[data-parent="${taskId}"]`);
+                        subtaskRows.forEach(row => {
+                            row.style.display = expandedTasks[taskId] ? 'table-row' : 'none';
+                            
+                            // Toggle expanded-child class for visual differentiation
+                            if (expandedTasks[taskId]) {
+                                row.classList.add('expanded-child');
+                                
+                                // Also highlight the timeline cell of each subtask
+                                const subtaskTimelineCell = row.querySelector('td:last-child');
+                                subtaskTimelineCell.classList.add('timeline-cell-highlighted');
+                            } else {
+                                row.classList.remove('expanded-child');
+                                
+                                // Remove highlight from the timeline cell of each subtask
+                                const subtaskTimelineCell = row.querySelector('td:last-child');
+                                subtaskTimelineCell.classList.remove('timeline-cell-highlighted');
+                            }
+                        });
+                    });
+                    labelCell.appendChild(expandIcon);
+                }
+                
+                taskRow.appendChild(labelCell);
+                
+                // Timeline cell
+                const timelineCell = document.createElement('td');
+                timelineCell.colSpan = months.length;
+                timelineCell.style.position = 'relative';
+                timelineCell.style.padding = '0';
+                
+                // Create timeline container
+                const timelineContainer = document.createElement('div');
+                timelineContainer.className = 'timeline-container';
+                timelineCell.appendChild(timelineContainer);
+                
+                // Add current date line
+                if (currentDate >= timeframeStart && currentDate <= timeframeEnd) {
+                    const dateDiff = (currentDate - timeframeStart) / (1000 * 60 * 60 * 24);
+                    const leftPosition = (dateDiff / totalDays) * 100;
+                    
+                    const dateLine = document.createElement('div');
+                    dateLine.className = 'current-date-line';
+                    dateLine.style.left = `${leftPosition}%`;
+                    timelineContainer.appendChild(dateLine);
+                    
+                    // Add triangle indicator at the top for the first row
+                    if (task.id === 1) {
+                        const dateIndicator = document.createElement('div');
+                        dateIndicator.className = 'current-date-indicator';
+                        dateIndicator.style.left = `${leftPosition}%`;
+                        timelineContainer.appendChild(dateIndicator);
+                    }
+                }
+                
+                // Draw task bar
+                const taskStart = parseDate(task.startDate);
+                const taskEnd = parseDate(task.endDate);
+                
+                if (taskStart <= timeframeEnd && taskEnd >= timeframeStart) {
+                    // Calculate position and width
+                    const startDiff = Math.max(0, (taskStart - timeframeStart) / (1000 * 60 * 60 * 24));
+                    const endDiff = Math.min(totalDays, (taskEnd - timeframeStart) / (1000 * 60 * 60 * 24));
+                    const leftPercent = (startDiff / totalDays) * 100;
+                    const widthPercent = ((endDiff - startDiff) / totalDays) * 100;
+                    
+                    // Create task bar
+                    const taskBar = document.createElement('div');
+                    taskBar.className = 'task-bar';
+                    taskBar.style.backgroundColor = chartColors.taskBar;
+                    taskBar.style.left = `${leftPercent}%`;
+                    taskBar.style.width = `${widthPercent}%`;
+                    timelineContainer.appendChild(taskBar);
+                    
+                    // Add progress if specified
+                    if (task.progress) {
+                        const progressStart = parseDate(task.progress.startDate);
+                        const progressEnd = parseDate(task.progress.endDate);
+                        
+                        if (progressStart <= timeframeEnd && progressEnd >= timeframeStart) {
+                            const progressStartDiff = Math.max(0, (progressStart - timeframeStart) / (1000 * 60 * 60 * 24));
+                            const progressEndDiff = Math.min(totalDays, (progressEnd - timeframeStart) / (1000 * 60 * 60 * 24));
+                            const progressLeftPercent = (progressStartDiff / totalDays) * 100;
+                            const progressWidthPercent = ((progressEndDiff - progressStartDiff) / totalDays) * 100;
+                            
+                            const progressBar = document.createElement('div');
+                            progressBar.className = 'task-progress';
+                            progressBar.style.backgroundColor = chartColors.progress;
+                            progressBar.style.left = `${progressLeftPercent}%`;
+                            progressBar.style.width = `${progressWidthPercent}%`;
+                            timelineContainer.appendChild(progressBar);
+                        }
+                    }
+                    
+                    // Add milestones
+                    if (task.milestones && task.milestones.length > 0) {
+                        task.milestones.forEach(milestone => {
+                            const milestoneDate = parseDate(milestone.date);
+                            
+                            if (milestoneDate >= timeframeStart && milestoneDate <= timeframeEnd) {
+                                const milestoneDiff = (milestoneDate - timeframeStart) / (1000 * 60 * 60 * 24);
+                                const milestoneLeftPercent = (milestoneDiff / totalDays) * 100;
+                                
+                                // Create milestone diamond
+                                const milestoneElem = document.createElement('div');
+                                milestoneElem.className = 'milestone';
+                                milestoneElem.style.backgroundColor = chartColors.milestone;
+                                milestoneElem.style.left = `${milestoneLeftPercent}%`;
+                                timelineContainer.appendChild(milestoneElem);
+                                
+                                // Add tooltip to the diamond
+                                addMilestoneTooltip(milestoneElem, milestone.label);
+                                
+                                // Create milestone label
+                                if (milestone.label) {
+                                    const milestoneLabel = document.createElement('div');
+                                    milestoneLabel.className = 'milestone-label';
+                                    milestoneLabel.textContent = milestone.label;
+                                    milestoneLabel.style.left = `${milestoneLeftPercent}%`;
+                                    timelineContainer.appendChild(milestoneLabel);
+                                    
+                                    // Add tooltip to the label
+                                    addMilestoneTooltip(milestoneLabel, milestone.label);
+                                }
+                            }
+                        });
+                    }
+                }
+                
+                taskRow.appendChild(timelineCell);
+                tbody.appendChild(taskRow);
+                
+                // Create subtask rows if task is expandable
+                if (task.expandable && task.subtasks) {
+                    task.subtasks.forEach((subtask, index) => {
+                        const subtaskRow = document.createElement('tr');
+                        subtaskRow.className = 'subtask-row';
+                        subtaskRow.dataset.parent = task.id;
+                        subtaskRow.style.display = 'none'; // Hidden by default
+                        
+                        // Subtask label cell
+                        const subtaskLabelCell = document.createElement('td');
+                        subtaskLabelCell.className = 'subtask-label';
+                        subtaskLabelCell.style.width = "300px";
+                        subtaskLabelCell.style.minWidth = "300px";
+                        subtaskLabelCell.innerHTML = `${subtask.title} <div class="task-description">${subtask.description}</div>`;
+                        subtaskRow.appendChild(subtaskLabelCell);
+                        
+                        // Subtask timeline cell
+                        const subtaskTimelineCell = document.createElement('td');
+                        subtaskTimelineCell.colSpan = months.length;
+                        subtaskTimelineCell.style.position = 'relative';
+                        subtaskTimelineCell.style.padding = '0';
+                        
+                        // Create timeline container for subtask
+                        const subtaskTimelineContainer = document.createElement('div');
+                        subtaskTimelineContainer.className = 'timeline-container';
+                        subtaskTimelineCell.appendChild(subtaskTimelineContainer);
+                        
+                        // Add current date line to subtask
+                        if (currentDate >= timeframeStart && currentDate <= timeframeEnd) {
+                            const dateDiff = (currentDate - timeframeStart) / (1000 * 60 * 60 * 24);
+                            const leftPosition = (dateDiff / totalDays) * 100;
+                            
+                            const dateLine = document.createElement('div');
+                            dateLine.className = 'current-date-line';
+                            dateLine.style.left = `${leftPosition}%`;
+                            subtaskTimelineContainer.appendChild(dateLine);
+                        }
+                        
+                        // Draw subtask bar
+                        const subtaskStart = parseDate(subtask.startDate);
+                        const subtaskEnd = parseDate(subtask.endDate);
+                        
+                        if (subtaskStart <= timeframeEnd && subtaskEnd >= timeframeStart) {
+                            // Calculate position and width
+                            const startDiff = Math.max(0, (subtaskStart - timeframeStart) / (1000 * 60 * 60 * 24));
+                            const endDiff = Math.min(totalDays, (subtaskEnd - timeframeStart) / (1000 * 60 * 60 * 24));
+                            const leftPercent = (startDiff / totalDays) * 100;
+                            const widthPercent = ((endDiff - startDiff) / totalDays) * 100;
+                            
+                            // Create subtask bar
+                            const subtaskBar = document.createElement('div');
+                            subtaskBar.className = 'task-bar';
+                            subtaskBar.style.backgroundColor = chartColors.subtaskBar;
+                            subtaskBar.style.left = `${leftPercent}%`;
+                            subtaskBar.style.width = `${widthPercent}%`;
+                            subtaskTimelineContainer.appendChild(subtaskBar);
+                            
+                            // Add progress if specified
+                            if (subtask.progress) {
+                                const progressStart = parseDate(subtask.progress.startDate);
+                                const progressEnd = parseDate(subtask.progress.endDate);
+                                
+                                if (progressStart <= timeframeEnd && progressEnd >= timeframeStart) {
+                                    const progressStartDiff = Math.max(0, (progressStart - timeframeStart) / (1000 * 60 * 60 * 24));
+                                    const progressEndDiff = Math.min(totalDays, (progressEnd - timeframeStart) / (1000 * 60 * 60 * 24));
+                                    const progressLeftPercent = (progressStartDiff / totalDays) * 100;
+                                    const progressWidthPercent = ((progressEndDiff - progressStartDiff) / totalDays) * 100;
+                                    
+                                    const progressBar = document.createElement('div');
+                                    progressBar.className = 'task-progress';
+                                    progressBar.style.backgroundColor = chartColors.subtaskProgress;
+                                    progressBar.style.left = `${progressLeftPercent}%`;
+                                    progressBar.style.width = `${progressWidthPercent}%`;
+                                    subtaskTimelineContainer.appendChild(progressBar);
+                                }
+                            }
+                        }
+                        
+                        // Add subtask milestones
+                        if (subtask.milestones && subtask.milestones.length > 0) {
+                            subtask.milestones.forEach(milestone => {
+                                const milestoneDate = parseDate(milestone.date);
+                                
+                                if (milestoneDate >= timeframeStart && milestoneDate <= timeframeEnd) {
+                                    const milestoneDiff = (milestoneDate - timeframeStart) / (1000 * 60 * 60 * 24);
+                                    const milestoneLeftPercent = (milestoneDiff / totalDays) * 100;
+                                    
+                                    // Create milestone diamond
+                                    const milestoneElem = document.createElement('div');
+                                    milestoneElem.className = 'milestone';
+                                    milestoneElem.style.backgroundColor = chartColors.subtaskMilestone;
+                                    milestoneElem.style.left = `${milestoneLeftPercent}%`;
+                                    subtaskTimelineContainer.appendChild(milestoneElem);
+                                    
+                                    // Add tooltip to the diamond
+                                    addMilestoneTooltip(milestoneElem, milestone.label);
+                                    
+                                    // Create milestone label
+                                    if (milestone.label) {
+                                        const milestoneLabel = document.createElement('div');
+                                        milestoneLabel.className = 'milestone-label';
+                                        milestoneLabel.textContent = milestone.label;
+                                        milestoneLabel.style.left = `${milestoneLeftPercent}%`;
+                                        subtaskTimelineContainer.appendChild(milestoneLabel);
+                                        
+                                        // Add tooltip to the label
+                                        addMilestoneTooltip(milestoneLabel, milestone.label);
+                                    }
+                                }
+                            });
+                        }
+                        
+                        subtaskRow.appendChild(subtaskTimelineCell);
+                        tbody.appendChild(subtaskRow);
+                    });
+                }
+            });
+            
+            table.appendChild(tbody);
+            container.appendChild(table);
+            
+            // Add grid lines for months (optional)
+            const rows = table.querySelectorAll('tbody tr');
+            rows.forEach(row => {
+                const timelineCell = row.querySelector('.timeline-container');
+                if (timelineCell) {
+                    // Add month dividers
+                    months.forEach((month, index) => {
+                        if (index > 0) { // Skip first month
+                            const monthDate = month.date;
+                            const dateDiff = (monthDate - timeframeStart) / (1000 * 60 * 60 * 24);
+                            const leftPercent = (dateDiff / totalDays) * 100;
+                            
+                            const divider = document.createElement('div');
+                            divider.style.position = 'absolute';
+                            divider.style.top = '0';
+                            divider.style.left = `${leftPercent}%`;
+                            divider.style.height = '100%';
+                            divider.style.width = '1px';
+                            divider.style.backgroundColor = '#e0e0e0';
+                            divider.style.zIndex = '0';
+                            
+                            timelineCell.appendChild(divider);
+                        }
+                    });
+                }
+            });
+        }
+
+        // Modify the addMilestoneTooltip function to keep tooltips within the screen
+        function addMilestoneTooltip(element, label) {
+            if (!label) return; // Don't add tooltip for empty labels
+            
+            element.addEventListener('mouseover', function(e) {
+                const tooltip = document.createElement('div');
+                tooltip.className = 'milestone-tooltip';
+                tooltip.textContent = label;
+                
+                // Add to DOM first (invisible) so we can measure its width
+                tooltip.style.opacity = '0';
+                document.body.appendChild(tooltip);
+                
+                // Get tooltip dimensions
+                const tooltipWidth = tooltip.offsetWidth;
+                const tooltipHeight = tooltip.offsetHeight;
+                
+                // Get viewport dimensions
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+                
+                // Calculate position to keep tooltip within screen
+                let leftPos = e.pageX + 10;
+                let topPos = e.pageY + 10;
+                
+                // Adjust if would go off right edge
+                if (leftPos + tooltipWidth + 20 > viewportWidth) {
+                    leftPos = e.pageX - tooltipWidth - 10; // Show on left side of cursor instead
+                }
+                
+                // Adjust if would go off bottom edge
+                if (topPos + tooltipHeight + 20 > viewportHeight) {
+                    topPos = e.pageY - tooltipHeight - 10; // Show above cursor instead
+                }
+                
+                // Apply the calculated position
+                tooltip.style.left = `${leftPos}px`;
+                tooltip.style.top = `${topPos}px`;
+                
+                // Show tooltip with animation
+                setTimeout(() => {
+                    tooltip.style.opacity = '1';
+                }, 10);
+                
+                const moveHandler = function(e) {
+                    // Recalculate position on mouse move
+                    let leftPos = e.pageX + 10;
+                    let topPos = e.pageY + 10;
+                    
+                    // Adjust if would go off right edge
+                    if (leftPos + tooltipWidth + 20 > viewportWidth) {
+                        leftPos = e.pageX - tooltipWidth - 10; // Show on left side of cursor instead
+                    }
+                    
+                    // Adjust if would go off bottom edge
+                    if (topPos + tooltipHeight + 20 > viewportHeight) {
+                        topPos = e.pageY - tooltipHeight - 10; // Show above cursor instead
+                    }
+                    
+                    tooltip.style.left = `${leftPos}px`;
+                    tooltip.style.top = `${topPos}px`;
+                };
+                
+                const outHandler = function() {
+                    tooltip.style.opacity = '0';
+                    document.removeEventListener('mousemove', moveHandler);
+                    element.removeEventListener('mouseout', outHandler);
+                    setTimeout(() => {
+                        if (tooltip.parentNode) {
+                            document.body.removeChild(tooltip);
+                        }
+                    }, 200);
+                };
+                
+                document.addEventListener('mousemove', moveHandler);
+                element.addEventListener('mouseout', outHandler);
+            });
+        }
+
+        
+        // Initialize chart
+        renderGanttChart();
+
+
+
+        // Get the modal element
+const modal = document.getElementById('update-modal');
+const modalMessage = document.getElementById('modal-message-content');
+const closeBtn = document.querySelector('.close-modal');
+
+// Close modal when clicking the X button
+closeBtn.onclick = function() {
+    modal.style.display = "none";
+}
+
+// Close modal when clicking outside the modal
+window.onclick = function(event) {
+    if (event.target == modal) {
+        modal.style.display = "none";
+    }
+}
+
+// Add this function to your code
+function createWeeklyUpdateButton(task, labelCell) {
+    const weeklyUpdateBtn = document.createElement('button');
+    weeklyUpdateBtn.className = 'weekly-update-btn';
+    weeklyUpdateBtn.textContent = 'Weekly updates';
+    weeklyUpdateBtn.addEventListener('click', function(e) {
+        e.stopPropagation(); // Prevent the click from affecting parent elements
+        
+        // Get the modal elements
+        const modal = document.getElementById('update-modal');
+        const modalTitle = document.querySelector('.modal-title');
+        const modalMessage = document.getElementById('modal-message-content');
+        
+        // Set modal title
+        modalTitle.textContent = `Updates for ${task.title}`;
+        
+        // Check if the task has a weekly message
+        if (task.weeklyMessage) {
+            // Set HTML content rather than just text
+            modalMessage.innerHTML = task.weeklyMessage;
+        } else {
+            modalMessage.textContent = "No weekly updates available for this task.";
+        }
+        
+        // Show the modal
+        modal.style.display = "block";
+    });
+    labelCell.appendChild(weeklyUpdateBtn);
+}
+    </script>
+</body>
+</html>
